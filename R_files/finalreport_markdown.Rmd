@@ -180,6 +180,7 @@ accuracy(fc[1:90,], valid_nonspecial_df)
 ```{r}
 ets_fit <- train_transactions_tsibble |> model(ETS(transactions))
 report(ets_fit)
+
 ets_fit |> gg_tsresiduals() + labs("ETS training errors")
 
 ets_fit |> components() |> autoplot()
@@ -195,6 +196,8 @@ accuracy(ets_fc$.mean[1:90], valid_transactions_tsibble$transactions)
 ets_fc |> autoplot(transactions_tsibble, level=NULL, color='red') + 
   ggtitle("ETS Model (ANA) with 90-day forecasts") +
   geom_line(data=ets_fit |> augment(), aes(y=.fitted), color='blue', lty=2)
+
+sum(ets_fc$.mean[1:90]) / sum(valid_transactions_tsibble$transactions)
 
 accuracy(ets_fit)
 accuracy(ets_fc[1:90,], valid_transactions_tsibble)
@@ -215,12 +218,14 @@ ets_fit |> components() |> autoplot()
 ets_fc <- ets_fit |> forecast(h=180)
 fitted_ets <- ets_fit |> augment()
 
-accuracy(ets_fit)
-accuracy(ets_fc[1:90,], valid_nonspecial_df)
-
 ets_fc |> autoplot(nonspecial_df, level=NULL, color='red') + 
   ggtitle("ETS Model (ANN) with 90-day forecasts") +
   geom_line(data=ets_fit |> augment(), aes(y=.fitted), color='blue', lty=2)
+
+sum(ets_fc$.mean[1:90]) / sum(valid_transactions_tsibble$transactions)
+
+accuracy(ets_fit)
+accuracy(ets_fc[1:90,], valid_nonspecial_df)
 
 ```
 
@@ -269,7 +274,8 @@ transactions_tsibble |> autoplot(transactions, color='darkgray') + autolayer(fc,
 
 sum(fc$.mean[1:90]) / sum(valid_transactions_tsibble$transactions[1:90])
 
-accuracy(fc$.mean[1:90], valid_transactions_tsibble$transactions[1:90])
+accuracy(dcmp_ets)
+accuracy(fc[1:90,], valid_nonspecial_df)
 
 ```
 
@@ -316,7 +322,7 @@ transactions_tsibble |> autoplot(transactions, color='darkgray') + autolayer(fc,
 
 sum(fc$.mean[1:90]) / sum(valid_transactions_tsibble$transactions)
 
-accuracy(dcmp_ets)
+accuracy(dcmp_arima)
 accuracy(fc[1:90,], valid_transactions_tsibble)
 
 ```
@@ -339,7 +345,7 @@ nonspecial_df |> autoplot(transactions, color='darkgray') + autolayer(fc, level=
 
 sum(fc$.mean[1:90]) / sum(valid_nonspecial_df$transactions)
 
-accuracy(dcmp_ets)
+accuracy(dcmp_arima)
 accuracy(fc[1:90,], valid_nonspecial_df)
 ```
 
@@ -351,7 +357,7 @@ accuracy(fc[1:90,], valid_nonspecial_df)
 fit <- train_transactions_tsibble |> model(
   mean = MEAN(transactions),
   naive = NAIVE(transactions),
-  seasonal_naive = RW(transactions ~ drift()))
+  drift = RW(transactions ~ drift()))
 
 fc <- fit |> forecast(h=180)
 transactions_tsibble |> autoplot(transactions, color='darkgray') + autolayer(fc, level=NULL) +
@@ -360,6 +366,11 @@ transactions_tsibble |> autoplot(transactions, color='darkgray') + autolayer(fc,
 
 accuracy(fit)
 accuracy(fc[1:90,], valid_transactions_tsibble)
+sum(fc$.mean[1:90]) / sum(valid_transactions_tsibble$transactions)
+accuracy(fc[181:270,], valid_transactions_tsibble)
+sum(fc$.mean[181:270]) / sum(valid_transactions_tsibble$transactions)
+accuracy(fc[361:450,], valid_transactions_tsibble)
+sum(fc$.mean[361:450]) / sum(valid_transactions_tsibble$transactions)
 ```
 
 ### Baseline - No Sundays or Holidays
@@ -368,7 +379,7 @@ accuracy(fc[1:90,], valid_transactions_tsibble)
 fit <- train_nonspecial_df |> model(
   mean = MEAN(transactions),
   naive = NAIVE(transactions),
-  seasonal_naive = RW(transactions ~ drift())) 
+  drift = RW(transactions ~ drift())) 
 
 fc <- fit |> forecast(h=180)
 nonspecial_df |> autoplot(transactions, color='darkgray') + autolayer(fc, level=NULL) + 
@@ -377,6 +388,11 @@ nonspecial_df |> autoplot(transactions, color='darkgray') + autolayer(fc, level=
 
 accuracy(fit)
 accuracy(fc[1:90,], valid_nonspecial_df)
+sum(fc$.mean[1:90]) / sum(valid_nonspecial_df$transactions)
+accuracy(fc[181:270,], valid_nonspecial_df)
+sum(fc$.mean[181:270]) / sum(valid_nonspecial_df$transactions)
+accuracy(fc[361:450,], valid_nonspecial_df)
+sum(fc$.mean[361:450]) / sum(valid_nonspecial_df$transactions)
 ```
 
 
