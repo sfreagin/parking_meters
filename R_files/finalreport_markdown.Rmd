@@ -1,7 +1,7 @@
 ---
-title: "Final Report Models"
+title: "Appendix A: Final Report Models"
 author: "Stephen Reagin"
-date: "2023-12-10"
+date: "2023-12-11"
 output: html_document
 ---
 
@@ -71,6 +71,8 @@ plot(x=nonspecial_df$date, y=nonspecial_df$transactions, xlab="Date",ylab="Daily
 
 ### Linear Regression - All Days
 
+$y_t = \beta_{0}+\beta_{1}{trend}+\beta_{2}season+\beta_{3}rain+\beta_{4}Tavg+\beta_{5}Tmin+\epsilon_{t}$
+
 ```{r}
 #fit the model
 fit_lm <- train_transactions_tsibble |> model(lm = TSLM(transactions ~ TAVG + 
@@ -83,7 +85,7 @@ fc_lm <- forecast(fit_lm, new_data = valid_transactions_tsibble)
 
 #transactions_tsibble |> autoplot(transactions) + autolayer(fc_lm)
 transactions_tsibble |> autoplot(transactions,color='darkgray') + autolayer(fc_lm, level=NULL) +
-  labs(title="Linear Regression 90-day forecast (all days included)", xlab="Date",ylab="Transactions")
+  labs(title="Linear Regression 90-day forecast (training set 1)", xlab="Date",ylab="Transactions")
 
 sum(fc_lm$.mean) / sum(valid_transactions_tsibble$transactions)
 
@@ -104,8 +106,7 @@ fc_lm <- forecast(fit_lm, new_data = valid_nonspecial_df)
 
 nonspecial_df |> autoplot(transactions, color='darkgray')  + 
   autolayer(fc_lm, level=NULL) +
-  labs(title='Transactions volume 2021 - 2023, with 90-day prediction (linear regression)', 
-       x='Date', ylab='Transactions') 
+  labs(title="Linear Regression 90-day forecast (training set 2)", xlab="Date",ylab="Transactions")
 
 sum(fc_lm$.mean) / sum(valid_nonspecial_df$transactions)
 
@@ -113,6 +114,23 @@ accuracy(fit_lm)
 accuracy(fc_lm, valid_nonspecial_df)
 
 
+```
+
+## Redefine tsibble object
+
+For the following models, having gaps in the date will create errors. This is especially a problem for the dataset which includes No Sundays and No Holidays, because it has *at least* one gap every week. Therefore, I am going to create a dummy index and have the models use the dummy index as a proxy for the date.
+
+```{r}
+#need to redefine tsibble objects to key on a dummy index
+
+nonspecial_df <- subset(transactions_tsibble, (isSunday == 0) & (isHoliday == 0))
+special_df <- subset(transactions_tsibble, (isSunday == 1) | (isHoliday == 1))
+
+nonspecial_df$X <- 1:length(nonspecial_df$X)
+nonspecial_df <- as_tsibble(nonspecial_df, index=X) 
+
+train_nonspecial_df <- nonspecial_df |> slice(0:(length(nonspecial_df$transactions)-90))
+valid_nonspecial_df <- nonspecial_df |> slice(n()-89:0)
 ```
 
 
@@ -130,8 +148,7 @@ fit |> gg_tsresiduals() + labs("ARIMA training errors")
 fc <- fit |> forecast(h=180) 
 
 transactions_tsibble |> autoplot(transactions, color='darkgray') + autolayer(fc, level=NULL) +
-  labs(title='All Days, transactions volume, 180 day forecast (ARIMA)', 
-       x='Date', ylab='Transactions') 
+  labs(title="ARIMA 180-day forecast (training set 1)", xlab="Date",ylab="Transactions")
 
 sum(fc$.mean[1:90]) / sum(valid_transactions_tsibble$transactions)
 
@@ -143,19 +160,6 @@ accuracy(fc[1:90,], valid_transactions_tsibble)
 ### ARIMA - No Sundays or holidays
 
 ```{r}
-#need to redefine tsibble objects to key on a dummy index
-
-nonspecial_df <- subset(transactions_tsibble, (isSunday == 0) & (isHoliday == 0))
-special_df <- subset(transactions_tsibble, (isSunday == 1) | (isHoliday == 1))
-
-nonspecial_df$X <- 1:length(nonspecial_df$X)
-nonspecial_df <- as_tsibble(nonspecial_df, index=X) 
-
-train_nonspecial_df <- nonspecial_df |> slice(0:(length(nonspecial_df$transactions)-90))
-valid_nonspecial_df <- nonspecial_df |> slice(n()-89:0)
-```
-
-```{r}
 fit <- train_nonspecial_df |> model(ARIMA(transactions ~ pdq(4,1,2)))
 report(fit)
 fit |> gg_tsresiduals() + labs("ARIMA training errors")
@@ -163,8 +167,7 @@ fit |> gg_tsresiduals() + labs("ARIMA training errors")
 fc <- fit |> forecast(h=180) 
 
 nonspecial_df |> autoplot(transactions, color='darkgray') + autolayer(fc, level=NULL) + 
-  labs(title='No Sundays/Holidays, transactions volume, 180 day forecast (ARIMA)', 
-       x='Date', ylab='Transactions') 
+  labs(title="ARIMA 180-day forecast (training set 2)", xlab="Date",ylab="Transactions")
 
 sum(fc$.mean[1:90]) / sum(valid_transactions_tsibble$transactions)
 
@@ -194,7 +197,7 @@ accuracy(fitted_ets$.fitted, train_transactions_tsibble$transactions)
 accuracy(ets_fc$.mean[1:90], valid_transactions_tsibble$transactions)
 
 ets_fc |> autoplot(transactions_tsibble, level=NULL, color='red') + 
-  ggtitle("ETS Model (ANA) with 90-day forecasts") +
+  ggtitle("ETS Model (ANA) 180-day forecast (training set 1)") +
   geom_line(data=ets_fit |> augment(), aes(y=.fitted), color='blue', lty=2)
 
 sum(ets_fc$.mean[1:90]) / sum(valid_transactions_tsibble$transactions)
@@ -219,7 +222,7 @@ ets_fc <- ets_fit |> forecast(h=180)
 fitted_ets <- ets_fit |> augment()
 
 ets_fc |> autoplot(nonspecial_df, level=NULL, color='red') + 
-  ggtitle("ETS Model (ANN) with 90-day forecasts") +
+  ggtitle("ETS Model (ANN) 180-day forecast (training set 2") +
   geom_line(data=ets_fit |> augment(), aes(y=.fitted), color='blue', lty=2)
 
 sum(ets_fc$.mean[1:90]) / sum(valid_transactions_tsibble$transactions)
@@ -269,8 +272,7 @@ fc <-  dcmp_ets |> forecast(h=180)
 
 
 transactions_tsibble |> autoplot(transactions, color='darkgray') + autolayer(fc, level=NULL) +
-  labs(title='All Days, transactions volume, 180 day forecast w/ STL + ETS(A,Ad,A)', 
-       x='Date', ylab='Transactions') 
+  labs(title="STL + ETS(A,Ad,A) 180-day forecast (training set 1)", xlab="Date",ylab="Transactions")
 
 sum(fc$.mean[1:90]) / sum(valid_transactions_tsibble$transactions[1:90])
 
@@ -293,8 +295,7 @@ dcmp_ets |> gg_tsresiduals() + labs("STL + ETS training errors")
 fc <-  dcmp_ets |> forecast(h=180)
 
 nonspecial_df |> autoplot(transactions, color='darkgray') + autolayer(fc, level=NULL) +
-  labs(title='No Sundays/Holidays, transactions volume, 180 day forecast w/ STL + ETS(A,Ad,N)', 
-       x='Date', ylab='Transactions') 
+  labs(title="STL + ETS(A,Ad,N) 180-day forecast (training set 2", xlab="Date",ylab="Transactions")
 
 sum(fc$.mean[1:90]) / sum(valid_nonspecial_df$transactions[1:90])
 
@@ -317,8 +318,7 @@ dcmp_arima |> gg_tsresiduals() + labs("STL + ARIMA training errors")
 fc <-  dcmp_arima |> forecast(h=180)
 
 transactions_tsibble |> autoplot(transactions, color='darkgray') + autolayer(fc, level=NULL) + 
-  labs(title='All Days, transactions, 180 day forecast (STL + ARIMA)', 
-       x='Date', ylab='Transactions') 
+  labs(title="STL + ARIMA 180-day forecast (training set 1)", xlab="Date",ylab="Transactions")
 
 sum(fc$.mean[1:90]) / sum(valid_transactions_tsibble$transactions)
 
@@ -339,8 +339,7 @@ dcmp_arima |> gg_tsresiduals() + labs("STL + ARIMA training errors")
 fc <-  dcmp_arima |> forecast(h=180)
 
 nonspecial_df |> autoplot(transactions, color='darkgray') + autolayer(fc, level=NULL) +
-  labs(title='No Sundays/Holidays Days, transactions, 180 day forecast (STL + ARIMA)', 
-       x='Date', ylab='Transactions') 
+  labs(title="STL + ARIMA 180-day forecast (training set 2)", xlab="Date",ylab="Transactions")
 
 
 sum(fc$.mean[1:90]) / sum(valid_nonspecial_df$transactions)
@@ -361,8 +360,7 @@ fit <- train_transactions_tsibble |> model(
 
 fc <- fit |> forecast(h=180)
 transactions_tsibble |> autoplot(transactions, color='darkgray') + autolayer(fc, level=NULL) +
-  labs(title='All Days, transactions volume, 180 day forecast (baseline)', 
-       x='Date', ylab='Transactions') 
+  labs(title="Baseline 180-day forecasts (training set 1)", xlab="Date",ylab="Transactions")
 
 accuracy(fit)
 accuracy(fc[1:90,], valid_transactions_tsibble)
@@ -383,8 +381,7 @@ fit <- train_nonspecial_df |> model(
 
 fc <- fit |> forecast(h=180)
 nonspecial_df |> autoplot(transactions, color='darkgray') + autolayer(fc, level=NULL) + 
-  labs(title='No Sundays/Holidays, transactions volume, 180 day forecast (baseline)', 
-       x='Date', ylab='Transactions') 
+  labs(title="Baseline 180-day forecasts (training set 2)", xlab="Date",ylab="Transactions")
 
 accuracy(fit)
 accuracy(fc[1:90,], valid_nonspecial_df)
@@ -438,15 +435,19 @@ nonspecial_df |> ggplot(aes(x=TAVG, y=transactions)) + geom_point() +
 
 ### ACF - All Days
 ```{r}
-transactions_tsibble |> ACF(difference(transactions), lag_max = 180) |> autoplot()
+train_transactions_tsibble |> ACF(difference(transactions), lag_max = 180) |> autoplot() +
+  labs(title = "ACF for Training Set 1")
 
-transactions_tsibble |> autoplot(difference(transactions, lag=7))
+train_transactions_tsibble |> autoplot(difference(transactions, lag=7)) +
+  labs(title = "Training Set 1, lag-7 difference")
 
 ```
 
 ### ACF - No Sundays, No Holidays
 ```{r}
-nonspecial_df |> ACF(difference(transactions), lag_max = 180) |> autoplot()
+train_nonspecial_df |> ACF(difference(transactions), lag_max = 180) |> autoplot() +
+  labs(title = "ACF for Training Set 2")
 
-nonspecial_df |> autoplot(difference(transactions, lag=1))
+train_nonspecial_df |> autoplot(difference(transactions, lag=1)) + 
+  labs(title = "Training Set 1, lag-7 difference")
 ```
