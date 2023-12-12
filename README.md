@@ -1,5 +1,6 @@
 # Forecasting Parking Meter Transactions in San Diego
 Author: Stephen Reagin
+
 Contact: sreagin@sandiego.edu
 
 This is a repository for a time series project fulfilling the requirements ADS 506 - Applied Time Series Analysis
